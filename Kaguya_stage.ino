@@ -2,8 +2,12 @@
 
 #define PIN 6
 #define STRIPSIZE 12
-#define WHATSAPPNOTIFICATION "new WANOT"
 #define MAX_MESSAGE_LENGTH 12
+#define UPDATE_CYCLE 5000
+
+// constants
+static const char WHATSAPPNOTIFICATION[MAX_MESSAGE_LENGTH] = "new WANOT";
+
 // Parameter 1 = number of pixels in strip
 // Parameter 2 = pin number (most are valid)
 // Parameter 3 = pixel type flags, add together as needed:
@@ -12,18 +16,29 @@
 //   NEO_GRB     Pixels are wired for GRB bitstream (most NeoPixel products)
 //   NEO_RGB     Pixels are wired for RGB bitstream (v1 FLORA pixels, not v2)
 Adafruit_NeoPixel strip = Adafruit_NeoPixel(STRIPSIZE, PIN, NEO_GRB + NEO_KHZ800);
+static const uint32_t standard_color = (255, 0, 0);
+static const uint32_t black_color = (0, 0, 0);
 
 void setup() {
   Serial.begin(9600); //This pipes to the serial monitor
   strip.begin();
-  strip.setBrightness(100);  // Lower brightness and save eyeballs!
+  strip.setBrightness(127);
   strip.show(); // Initialize all pixels to 'off'
-  colorWipe(strip.Color(255, 0, 0), 100); // Red
+  colorWipe(strip.Color(255, 0, 0), 1000); // Red
 }
 
 void loop() {
-  delay(1000);
-  IncomingNotification();
+  delay(UPDATE_CYCLE);
+  if (Serial.available() > 0)
+  {
+    IncomingNotification();
+    // return to red
+    colorWipe(strip.Color(255, 0, 0), 100);
+  } 
+  else 
+  {
+    //Do nothing
+  }  
 }
 
 // Fill the dots one after the other with a color
@@ -36,12 +51,16 @@ void colorWipe(uint32_t c, uint8_t wait) {
 }
 
 // makes LED strip blink twice when called
-void TwoBlinkNotification(uint32_t color, int speed=100)
+void TwoBlinkNotification(uint32_t color, int speed=50)
 {
-  colorWipe(strip.Color(255, 0, 0), 0);
-  delay(speed);
-  colorWipe(strip.Color(255, 0, 0), 0);
-  delay(speed);
+  //change to color
+  colorWipe(color, speed);
+  //blink to black
+  colorWipe(black_color, speed);
+  //change to color
+  colorWipe(color, speed);
+  //blink to black
+  colorWipe(black_color, speed);
 }
 
 
@@ -51,36 +70,37 @@ void IncomingNotification() {
   
   while (Serial.available() > 0)
   {
-    //Create a place to hold the incoming message
-    static char message[MAX_MESSAGE_LENGTH];
-    static unsigned int message_pos = 0;
+
+    //Create a place to hold the incoming message       
+    static char readInput[MAX_MESSAGE_LENGTH];
+    static unsigned int read_pos = 0;
 
     //Read the next available byte in the serial receive buffer
     char inByte = Serial.read();
 
     //Message coming in (check not terminating character) and guard for over message size
-    if ( inByte != '\n' && (message_pos < MAX_MESSAGE_LENGTH - 1) )
+    if ( inByte != '\n' && (read_pos < MAX_MESSAGE_LENGTH - 1) )
     {
       //Add the incoming byte to our message
-      message[message_pos] = inByte;
-      message_pos++;
+      readInput[read_pos] = inByte;
+      read_pos++;
     } else 
     {
-      //Add null character to string
-      message[message_pos] = '\0';
-
-      //Print the message (or do other things)
-      Serial.println(message); // put LED function here
-      if(message == WHATSAPPNOTIFICATION)
+      
+      //Print the message (or do other things) 
+      if(strcmp(readInput, WHATSAPPNOTIFICATION) == 0)
       {
         // blink green twice
         TwoBlinkNotification(strip.Color(0, 255, 0), 50); 
+        delay(500);
+        TwoBlinkNotification(strip.Color(0, 255, 0), 50); 
+        delay(500);
       } else 
       {
         //Do Nothing        
       }
       //Reset for the next message
-      message_pos = 0;
+      read_pos = 0;
     }
   } // end while
 }
